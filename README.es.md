@@ -12,7 +12,7 @@ Aulari es una aplicación de escritorio para estudiantes. Descarga los archivos 
 
 ## Funciones
 
-- **Inicio de sesión con el sistema de acceso de tu universidad** (por ejemplo, CAS): inicias sesión en tu propio navegador y, en Windows, la aplicación recibe la sesión sola (en macOS, de momento, copias una dirección a mano; ver más abajo). Nunca se escribe ninguna contraseña en la aplicación.
+- **Inicio de sesión con el sistema de acceso de tu universidad** (por ejemplo, CAS): inicias sesión en tu propio navegador y la aplicación recibe la sesión sola (en macOS, con la aplicación instalada desde el `.dmg`). Nunca se escribe ninguna contraseña en la aplicación.
 - **Carpetas ordenadas**: `<destino>/<curso académico>/<asignatura>/<NN - sección>/`, con alias cortos de asignatura (`Camps i Ones Electromagnètiques` → `CiOE`) que puedes cambiar.
 - **Se adapta a las carpetas que ya tienes**: cambia el nombre de la carpeta de cada curso académico (`2026-27` → `2n Curs`) y, si quieres, guarda el material del campus en una subcarpeta de cada asignatura (`BD/Campus/`), al lado de tus apuntes. Puedes cambiar las dos cosas cuando quieras; Aulari solo mueve lo que descargó.
 - **Nombres con o sin espacios**: tal como vienen (`01 - Tema 1/Tema 5.pdf`) o con `_` o `-` en su lugar (`01_Tema_1/Tema_5.pdf`). Cambiarlo después renombra lo ya descargado, y volver atrás recupera los nombres originales.
@@ -82,7 +82,7 @@ python -m aulari
 ## Cómo se usa
 
 1. **Inicia sesión**: pulsa *Abrir navegador*, entra en tu campus como siempre y acepta cuando el navegador pregunte si quieres abrir la aplicación. La ventana continúa sola.
-   En macOS el inicio de sesión automático aún no está disponible. En Google Chrome u otro navegador basado en Chromium, abre una pestaña nueva con las herramientas de desarrollo grabando (*Red* → *Conservar registro*), pulsa **Copiar dirección de inicio** en Aulari y pégala en esa pestaña. Después de iniciar sesión, copia la cabecera `Location` de la petición `launch.php` (estado 302, empieza por `moodlemobile://`) y pégala en la aplicación. La pantalla de inicio de sesión muestra estos pasos. También funciona si tu sesión del campus sigue abierta en el navegador, que redirige al instante y deja la pestaña en blanco.
+   En macOS funciona con la aplicación instalada desde el `.dmg`, y es más rápido si tu sesión del campus ya está abierta en el navegador. La pestaña del navegador se queda abierta cuando la aplicación toma el relevo; puedes cerrarla. Si ejecutas Aulari desde el código fuente, o si otra aplicación abre los enlaces `moodlemobile://`, el inicio de sesión es manual: en Google Chrome u otro navegador basado en Chromium, abre una pestaña nueva con las herramientas de desarrollo grabando (*Red* → *Conservar registro*), pulsa **Copiar dirección de inicio** en Aulari y pégala en esa pestaña. Después de iniciar sesión, copia la cabecera `Location` de la petición `launch.php` (estado 302, empieza por `moodlemobile://`) y pégala en la aplicación. La pantalla de inicio de sesión muestra estos pasos. También funciona si tu sesión del campus sigue abierta en el navegador, que redirige al instante y deja la pestaña en blanco.
 2. **Elige tus asignaturas** con las casillas y una **carpeta de destino**.
 3. Pulsa **Sincronizar**. El resumen muestra lo nuevo; el calendario se exporta a `<destino>/<curso académico>/calendari.ics`.
 
@@ -96,7 +96,7 @@ La interfaz está en catalán, castellano e inglés (selector en la parte inferi
 | Configuración, registro de descargas, logs | Windows: `%LOCALAPPDATA%\aulari\`. macOS: `~/Library/Application Support/aulari/` |
 | Material descargado | La carpeta de destino que elijas |
 
-En Windows, durante el inicio de sesión, la aplicación se registra, **solo para tu usuario de Windows**, como programa para los enlaces `moodlemobile://`, y quita ese registro en cuanto termina.
+En Windows, durante el inicio de sesión, la aplicación se registra, **solo para tu usuario de Windows**, como programa para los enlaces `moodlemobile://`, y quita ese registro en cuanto termina. En macOS la aplicación declara esos enlaces por sí misma mientras está instalada, para que el navegador le pueda pasar el inicio de sesión; Aulari ignora cualquier enlace de ese tipo que no corresponda a un inicio de sesión empezado por ella, y nunca cambia qué aplicación usa macOS para abrirlos.
 
 ## Seguridad y privacidad
 
@@ -114,7 +114,7 @@ El material de las asignaturas pertenece a sus autores y es para los estudiantes
 ## Limitaciones
 
 - De momento, solo Windows y macOS (Apple Silicon); Linux está previsto.
-- En macOS aún no hay inicio de sesión ni sincronización automáticos, la aplicación no está notarizada, los archivos descargados no se marcan como procedentes de internet y los enlaces externos se guardan como accesos directos `.url` de Windows. Después de una actualización, macOS puede volver a preguntar si Aulari puede usar el Llavero.
+- En macOS aún no hay sincronización automática, la aplicación no está notarizada, los archivos descargados no se marcan como procedentes de internet y los enlaces externos se guardan como accesos directos `.url` de Windows. Después de una actualización, macOS puede volver a preguntar si Aulari puede usar el Llavero.
 - No se descargan el texto HTML de las páginas ni los vídeos de plataformas externas.
 - Un solo equipo por carpeta de destino (otro equipo puede tomar el relevo).
 

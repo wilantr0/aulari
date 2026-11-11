@@ -12,7 +12,7 @@ Aulari is a desktop app for students. It downloads the files of your courses fro
 
 ## Features
 
-- **Login with your university's single sign-on** (for example CAS): you log in in your own browser and, on Windows, the app receives the session by itself (on macOS you copy one address by hand for now, see below). No password is ever typed into the app.
+- **Login with your university's single sign-on** (for example CAS): you log in in your own browser and the app receives the session by itself (on macOS, with the app installed from the `.dmg`). No password is ever typed into the app.
 - **Tidy folders**: `<destination>/<academic year>/<course>/<NN - section>/`, with short course aliases (`Camps i Ones Electromagnètiques` → `CiOE`) that you can rename.
 - **Fits the folders you already have**: rename each academic year folder (`2026-27` → `2n Curs`) and, if you like, keep the campus material in a subfolder of each course (`BD/Campus/`) next to your own notes. You can change both at any time; Aulari moves only what it downloaded.
 - **Names with or without spaces**: keep them as they come (`01 - Tema 1/Tema 5.pdf`) or use `_` or `-` instead (`01_Tema_1/Tema_5.pdf`). Changing it later renames what was already downloaded, and changing back restores the original names.
@@ -82,7 +82,7 @@ python -m aulari
 ## How to use it
 
 1. **Log in**: press *Abrir navegador*, log in to your campus as usual and accept when the browser asks to open the app. The window continues by itself.
-   On macOS, automatic login is not available yet. In Google Chrome or another Chromium-based browser, open a new tab with the developer tools recording (*Network* → *Preserve log*), press **Copy login address** in Aulari and paste it into that tab. After logging in, copy the `Location` header of the `launch.php` request (status 302, it starts with `moodlemobile://`) and paste it into the app. The login screen shows these steps. This also works when your campus session is still open in the browser, which redirects at once and leaves the tab blank.
+   On macOS this works with the app installed from the `.dmg`, and it is quickest when your campus session is already open in the browser. The browser tab stays open after the app takes over; you can close it. When Aulari is run from source, or if another app opens `moodlemobile://` links, the login is manual: in Google Chrome or another Chromium-based browser, open a new tab with the developer tools recording (*Network* → *Preserve log*), press **Copy login address** in Aulari and paste it into that tab. After logging in, copy the `Location` header of the `launch.php` request (status 302, it starts with `moodlemobile://`) and paste it into the app. The login screen shows these steps. This also works when your campus session is still open in the browser, which redirects at once and leaves the tab blank.
 2. **Choose your courses** with the checkboxes and a **destination folder**.
 3. Press **Sincronizar**. The summary shows what is new; the calendar is exported to `<destination>/<academic year>/calendari.ics`.
 
@@ -96,7 +96,7 @@ The interface is available in Catalan, Spanish and English (selector at the bott
 | Settings, registry of downloads, logs | Windows: `%LOCALAPPDATA%\aulari\`. macOS: `~/Library/Application Support/aulari/` |
 | Downloaded material | The destination folder you choose |
 
-On Windows, during login the app registers itself, **only for your Windows user**, as the handler of `moodlemobile://` links, and removes that registration as soon as the login ends.
+On Windows, during login the app registers itself, **only for your Windows user**, as the handler of `moodlemobile://` links, and removes that registration as soon as the login ends. On macOS the app declares those links itself while it is installed, so the browser can hand the login over to it; Aulari ignores any such link that does not belong to a login it started, and it never changes which app macOS uses for them.
 
 ## Security and privacy
 
@@ -114,7 +114,7 @@ The material of your courses belongs to its authors and is for enrolled students
 ## Limitations
 
 - Windows and macOS (Apple Silicon) only; Linux is planned.
-- On macOS, automatic login and automatic sync are not available yet, the app is not notarized, downloaded files are not marked as coming from the internet, and external links are saved as Windows `.url` shortcuts. After an update, macOS may ask again whether Aulari can use the Keychain.
+- On macOS, automatic sync is not available yet, the app is not notarized, downloaded files are not marked as coming from the internet, and external links are saved as Windows `.url` shortcuts. After an update, macOS may ask again whether Aulari can use the Keychain.
 - The HTML text of pages and videos from external platforms are not downloaded.
 - One computer per destination folder (another computer can take over the folder).
 
