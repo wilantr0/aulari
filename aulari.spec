@@ -10,10 +10,11 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 from aulari import __version__
 
+# Reverse-DNS id of the macOS app (never changes, D8) and the URL scheme the
+# app receives the login redirect on; both live in the package.
+from aulari.ui.mac_url_handler import BUNDLE_IDENTIFIER, SCHEME
+
 IS_MACOS = sys.platform == "darwin"
-# Reverse-DNS id of the macOS app. macOS ties the app's Keychain access and
-# settings to it, so it should never change once released.
-BUNDLE_IDENTIFIER = "io.github.alar89.aulari"
 
 # UI texts and the window icon are data files inside the package.
 datas = collect_data_files("aulari", includes=["strings/*.json", "assets/*.ico"])
@@ -67,5 +68,9 @@ if IS_MACOS:
             "NSHumanReadableCopyright": "Copyright (c) 2026 ALar89. MIT License.",
             "NSHighResolutionCapable": True,
             "LSApplicationCategoryType": "public.app-category.education",
+            # macOS hands moodlemobile:// links (the login redirect) to the app.
+            "CFBundleURLTypes": [
+                {"CFBundleURLName": "Moodle mobile login", "CFBundleURLSchemes": [SCHEME]}
+            ],
         },
     )

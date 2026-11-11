@@ -21,7 +21,7 @@ from aulari.moodle_client import InvalidTokenError, MoodleError
 from aulari.sync import NotOwnerError, SyncLockedError
 from aulari.texts import text
 from aulari.ui.login_frame import LoginFrame, system_text
-from aulari.ui.main import default_app_dir
+from aulari.ui.main import bring_to_front, default_app_dir, route_login_url
 from aulari.ui.messages import error_message
 from aulari.ui.worker import UnexpectedError, Worker
 
@@ -157,6 +157,111 @@ class LoginFrameMacTests(unittest.TestCase):
             self.assertIsNone(frame._copy_button)
             self.assertFalse(frame._manual_visible)
             frame.destroy()
+
+
+REDIRECT = "moodlemobile://token=c2lnbmF0dXJlOjo6dG9rZW4="
+
+
+class LoginFrameMacAutomaticTests(unittest.TestCase):
+    """macOS app bundle that opens moodlemobile:// (faked): the URL arrives by itself."""
+
+    def setUp(self) -> None:
+        """Build the login screen as the macOS bundle, or skip without a display."""
+        try:
+            self.root = tk.Tk()
+        except tk.TclError:
+            self.skipTest("No display available for Tkinter")
+        self.root.withdraw()
+        self.folder = tempfile.TemporaryDirectory()
+        self.app = FakeLoginApp(Path(self.folder.name))
+        patches = [
+            mock.patch("sys.platform", "darwin"),
+            mock.patch(
+                "aulari.ui.login_frame.mac_url_handler.automatic_login_available",
+                return_value=True,
+            ),
+            mock.patch("aulari.ui.login_frame.webbrowser.open"),
+        ]
+        for patch in patches:
+            patch.start()
+            self.addCleanup(patch.stop)
+        self.frame = LoginFrame(self.root, self.app, Worker(self.root), lambda: None)
+
+    def tearDown(self) -> None:
+        """Destroy the root window and delete the folder."""
+        self.root.destroy()
+        self.folder.cleanup()
+
+    def test_automatic_mode_hides_the_manual_steps(self) -> None:
+        """Like on Windows, the manual part starts hidden (it stays available)."""
+        self.assertFalse(self.frame._manual_visible)
+
+    def test_url_after_open_browser_is_checked(self) -> None:
+        """Open browser waits; the URL from macOS is checked and the timer stopped."""
+        self.frame._open_browser()
+        self.assertEqual(self.frame._status.get(), text("login_waiting"))
+        self.assertIsNotNone(self.frame._timeout_id)
+        with mock.patch.object(self.frame, "_check") as check:
+            self.frame.receive_url(REDIRECT)
+        check.assert_called_once_with(REDIRECT)
+        self.assertIsNone(self.frame._timeout_id)
+
+    def test_url_without_attempt_is_ignored(self) -> None:
+        """A URL with no login attempt (stray link, app just started) is not checked."""
+        with mock.patch.object(self.frame, "_check") as check:
+            self.frame.receive_url(REDIRECT)
+        check.assert_not_called()
+        self.assertEqual(self.frame._status.get(), text("login_need_browser_first"))
+
+    def test_waiting_times_out(self) -> None:
+        """After the wait limit the screen says so; a later URL still needs its attempt."""
+        self.frame._open_browser()
+        self.frame._wait_timed_out()
+        self.assertEqual(self.frame._status.get(), text("login_timeout"))
+        self.assertIsNone(self.frame._timeout_id)
+
+
+class RouteLoginUrlTests(unittest.TestCase):
+    """route_login_url(): only the login screen receives the URL."""
+
+    def test_login_screen_receives_it(self) -> None:
+        """The URL goes to LoginFrame.receive_url()."""
+        frame = mock.create_autospec(LoginFrame, instance=True)
+        route_login_url(frame, REDIRECT)
+        frame.receive_url.assert_called_once_with(REDIRECT)
+
+    def test_other_screens_ignore_it(self) -> None:
+        """On another screen, or none yet, nothing happens and the token is not logged."""
+        with self.assertLogs("aulari.ui.main", level="INFO") as logs:
+            route_login_url(None, REDIRECT)
+            route_login_url(mock.Mock(), REDIRECT)
+        self.assertNotIn("c2lnbmF0dXJl", "\n".join(logs.output))
+
+
+class BringToFrontTests(unittest.TestCase):
+    """bring_to_front(): the window comes in front of the browser (activation is mocked)."""
+
+    def test_window_and_app_come_forward(self) -> None:
+        """The window is shown and raised, and the app activated."""
+        root = mock.Mock()
+        with mock.patch("aulari.ui.main.mac_url_handler.activate_app") as activate:
+            bring_to_front(root)
+        activate.assert_called_once_with()
+        root.deiconify.assert_called_once_with()
+        root.lift.assert_called_once_with()
+        root.focus_force.assert_called_once_with()
+
+    def test_activation_error_is_only_logged(self) -> None:
+        """If macOS cannot be asked, the window is still raised and nothing fails."""
+        root = mock.Mock()
+        with (
+            mock.patch(
+                "aulari.ui.main.mac_url_handler.activate_app", side_effect=OSError("no runtime")
+            ),
+            self.assertLogs("aulari.ui.main", level="WARNING"),
+        ):
+            bring_to_front(root)
+        root.lift.assert_called_once_with()
 
 
 class SystemTextTests(unittest.TestCase):

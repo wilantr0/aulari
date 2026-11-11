@@ -8,11 +8,15 @@ login ends, fails, times out or the screen closes.
 
 A hidden manual paste field stays available as a fallback. The pasted URL
 contains the token: the entry shows dots and is cleared right after reading.
-On macOS the automatic login is not implemented yet: the manual fallback is
-shown from the start, with a button that copies the launch.php URL (it holds
-no token). The user pastes it into a browser tab whose developer tools are
-already recording, so the redirect is captured even when the campus session
-is still open and the browser redirects at once.
+
+On macOS the app bundle declares moodlemobile:// itself (mac_url_handler), so
+there is no registration and no socket: macOS hands the redirect to the
+running app, ui/main.py passes it to receive_url() and it is checked with
+the passport of the current attempt. That needs the bundle and Aulari being
+the default app for the scheme; otherwise (for example, run from source) the
+manual fallback is shown from the start, with a button that copies the
+launch.php URL (it holds no token) to paste into a browser tab whose
+developer tools are already recording.
 """
 
 import functools
@@ -26,7 +30,7 @@ from tkinter import ttk
 from aulari import auth
 from aulari.app import CampusApp
 from aulari.texts import text
-from aulari.ui import url_handler
+from aulari.ui import mac_url_handler, url_handler
 from aulari.ui.login_handoff import HandoffServer
 from aulari.ui.messages import error_message
 from aulari.ui.worker import Worker
@@ -80,6 +84,9 @@ class LoginFrame(ttk.Frame):
         self._status = tk.StringVar()
         self._manual_visible = False
         self._copy_button = None
+        self._timeout_id = None
+        # macOS: the app bundle receives moodlemobile:// itself (no registry, no socket).
+        self._mac_automatic = is_macos() and mac_url_handler.automatic_login_available()
         self._build()
         self.bind("<Destroy>", self._on_destroy)
 
@@ -90,9 +97,11 @@ class LoginFrame(ttk.Frame):
         ttk.Label(self, text=text("login_title"), font=("", 14, "bold")).pack(anchor="w")
         ttk.Label(self, text=text("login_site_label")).pack(anchor="w", pady=(PADDING, 0))
         ttk.Entry(self, textvariable=self._site, width=60).pack(fill="x")
-        ttk.Label(
-            self, text=system_text("login_steps"), wraplength=WRAP_PIXELS, justify="left"
-        ).pack(anchor="w", pady=PADDING)
+        # With the macOS automatic login the steps are the same as on Windows.
+        steps = text("login_steps") if self._mac_automatic else system_text("login_steps")
+        ttk.Label(self, text=steps, wraplength=WRAP_PIXELS, justify="left").pack(
+            anchor="w", pady=PADDING
+        )
         self._browser_button = ttk.Button(
             self, text=text("login_open_browser"), command=self._open_browser
         )
@@ -127,8 +136,8 @@ class LoginFrame(ttk.Frame):
             self._manual, text=text("login_button"), command=self._login
         )
         self._login_button.pack(anchor="w", pady=(PADDING, 0))
-        if is_macos():
-            self._toggle_manual()  # the only way to log in on macOS for now
+        if is_macos() and not self._mac_automatic:
+            self._toggle_manual()  # the only way to log in here
 
     def _toggle_manual(self) -> None:
         """Show or hide the manual paste fallback."""
@@ -149,25 +158,38 @@ class LoginFrame(ttk.Frame):
     # --- waiting for the browser ----------------------------------------
 
     def _start_waiting(self) -> None:
-        """Register the URL handler and open the local socket.
+        """Wait for the browser: on macOS for receive_url(), elsewhere on a local socket.
 
-        If this fails, the manual fallback is shown instead.
+        On Windows the URL handler is registered and the socket opened; if
+        that fails, the manual fallback is shown instead.
         """
-        try:
-            url_handler.register(self._app.app_dir)
-            self._server = HandoffServer(self._app.app_dir)
-            self._waited_ms = 0
-            self.after(POLL_MS, self._poll_browser)
+        if self._mac_automatic:
+            self._timeout_id = self.after(WAIT_LIMIT_MS, self._wait_timed_out)
             self._status.set(text("login_waiting"))
-        except OSError as error:
-            logger.warning("Automatic login not available: %s", error)
-            self._stop_waiting()
-            self._status.set(text("login_auto_unavailable"))
-            if not self._manual_visible:
-                self._toggle_manual()
+        else:
+            try:
+                url_handler.register(self._app.app_dir)
+                self._server = HandoffServer(self._app.app_dir)
+                self._waited_ms = 0
+                self.after(POLL_MS, self._poll_browser)
+                self._status.set(text("login_waiting"))
+            except OSError as error:
+                logger.warning("Automatic login not available: %s", error)
+                self._stop_waiting()
+                self._status.set(text("login_auto_unavailable"))
+                if not self._manual_visible:
+                    self._toggle_manual()
+
+    def _wait_timed_out(self) -> None:
+        """macOS: stop waiting for the browser after WAIT_LIMIT_MS."""
+        self._timeout_id = None
+        self._status.set(text("login_timeout"))
 
     def _stop_waiting(self) -> None:
-        """Close the socket and remove the URL handler (safe to call twice)."""
+        """Stop the timer, close the socket and remove the URL handler (safe to call twice)."""
+        if self._timeout_id is not None:
+            self.after_cancel(self._timeout_id)
+            self._timeout_id = None
         if self._server is not None:
             self._server.close()
             self._server = None
@@ -230,6 +252,20 @@ class LoginFrame(ttk.Frame):
             self._stop_waiting()
             self._app.switch_site(previous)
             self._on_back()
+
+    def receive_url(self, redirect_url: str) -> None:
+        """macOS: check a moodlemobile:// URL that the system handed to the app.
+
+        It is only accepted while a login attempt exists (its passport) and no
+        check is running; anything else is ignored, logging only its shape.
+        """
+        if self._passport and not self._worker.is_busy():
+            self._stop_waiting()
+            self._check(redirect_url)
+        else:
+            logger.info("Login URL ignored: %s", auth.redirect_shape(redirect_url))
+            if not self._passport:
+                self._status.set(text("login_need_browser_first"))
 
     def _on_return(self, _event: tk.Event) -> None:
         """Pressing Enter in the paste field logs in."""

@@ -13,10 +13,11 @@ from tkinter import messagebox, ttk
 
 import keyring.errors
 
+from aulari import auth
 from aulari.app import CampusApp
 from aulari.log_filter import configure_logging
 from aulari.texts import LANGUAGES, current_language, detect_language, set_language, text
-from aulari.ui import url_handler
+from aulari.ui import mac_url_handler, url_handler
 from aulari.ui.home_frame import HomeFrame
 from aulari.ui.icon import set_window_icon
 from aulari.ui.login_frame import LoginFrame
@@ -29,6 +30,31 @@ LOG_DIR_NAME = "logs"
 LOG_FILE_NAME = "aulari.log"
 MIN_WIDTH = 620
 MIN_HEIGHT = 560
+# Tcl command Tk on macOS calls with each URL the system sends to the app.
+MAC_LAUNCH_URL_COMMAND = "::tk::mac::LaunchURL"
+
+logger = logging.getLogger(__name__)
+
+
+def route_login_url(frame: ttk.Frame | None, redirect_url: str) -> None:
+    """Give a moodlemobile:// URL to the login screen, or ignore it on any other screen."""
+    if isinstance(frame, LoginFrame):
+        frame.receive_url(redirect_url)
+    else:
+        logger.info(
+            "Login URL ignored outside the login screen: %s", auth.redirect_shape(redirect_url)
+        )
+
+
+def bring_to_front(root: tk.Tk) -> None:
+    """macOS: show the window in front of the browser that just handed over a URL."""
+    root.deiconify()
+    root.lift()
+    try:
+        mac_url_handler.activate_app()
+    except OSError as error:
+        logger.warning("Could not bring the app to the front: %s", error)
+    root.focus_force()
 
 
 def default_app_dir() -> Path:
@@ -57,6 +83,9 @@ class MainWindow:
         self._worker = Worker(root)
         self._frame = None
         self._language_bar = None
+        if sys.platform == "darwin":
+            # First of all: macOS may have started the app just to deliver a URL.
+            root.createcommand(MAC_LAUNCH_URL_COMMAND, self._receive_login_url)
         self._build_language_bar()
         self._remove_leftover_handler()
         self._first_run_notice()
@@ -66,6 +95,11 @@ class MainWindow:
         except keyring.errors.KeyringError as error:
             messagebox.showerror(text("app_title"), error_message(error))
         self._show_for_session(logged_in)
+
+    def _receive_login_url(self, redirect_url: str) -> None:
+        """macOS: Tk calls this with a moodlemobile:// URL sent by the system."""
+        bring_to_front(self._root)
+        route_login_url(self._frame, redirect_url)
 
     def _first_run_notice(self) -> None:
         """Show once that the material is for personal use only (RF12)."""
